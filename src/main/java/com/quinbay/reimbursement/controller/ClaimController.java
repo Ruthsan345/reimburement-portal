@@ -6,14 +6,14 @@ import com.quinbay.reimbursement.exception.UserDefinedException;
 import com.quinbay.reimbursement.model.*;
 import com.quinbay.reimbursement.response.ResponseHandler;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.endpoint.web.annotation.RestControllerEndpoint;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
-import java.util.List;
 
 @RequestMapping("claim/api/")
 @RestController()
@@ -29,20 +29,19 @@ public class ClaimController {
             String result = claimsOp.addClaimCategory(claimCategory);
             return ResponseHandler.generateResponse("Successfully Added claim category", HttpStatus.OK, result);
         } catch (Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
     @GetMapping("/getAllCategories")
     public ResponseEntity<Object> getAllCategories() {
         try {
-            ArrayList<ClaimCategory> result = claimsOp.getAllCategories();
+            ArrayList<ClaimCategoryResponse> result = claimsOp.getAllCategories();
             return ResponseHandler.generateResponse("Success got categories", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
-
 
 
     @PostMapping("/addClaim")
@@ -51,21 +50,33 @@ public class ClaimController {
         try {
             String result = claimsOp.addClaim(claim);
             return ResponseHandler.generateResponse("Successfully Added claim", HttpStatus.OK, result);
-        } catch (Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
-    @PostMapping("/addClaimUsingImage")
-    public ResponseEntity<Object> addClaimUsingImage(@RequestParam List<MultipartFile> files ,@RequestBody ClaimRequest claimRequest ) {
+    @PostMapping("/addImageForClaim")
+    public ResponseEntity<Object> addClaimUsingImage(@RequestParam("files") MultipartFile[] files, @RequestParam int claimId) {
 
         try {
-            String result = claimsOp.addClaimUsingImage(claimRequest, files);
-            return ResponseHandler.generateResponse("Successfully Added claim", HttpStatus.OK, result);
-        } catch (Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            String result = claimsOp.addClaimUsingImage(files,claimId);
+            return ResponseHandler.generateResponse("Successfully Added images", HttpStatus.OK, result);
+        } catch (Exception | UserDefinedException e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
+
+//    @PostMapping("/addClaimUsingImages")
+//    public ResponseEntity<Object> addClaimUsingImages(@RequestBody ClaimImageRequestTest claimImageRequestTest ) {
+//
+//        try {
+//            String result =" "+claimImageRequestTest.getEmployeeid();
+////                    claimsOp.addClaimUsingImage(files);
+//            return ResponseHandler.generateResponse("Successfully Added claim", HttpStatus.OK, result);
+//        } catch (Exception e) {
+//            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+//        }
+//    }
 
     @GetMapping("/getAllClaims")
     public ResponseEntity<Object> getAllClaims() {
@@ -73,18 +84,30 @@ public class ClaimController {
             ArrayList<Claim> result = claimsOp.getAllClaims();
             return ResponseHandler.generateResponse("Success got categories", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
 
     @GetMapping("/getClaimsByEmployeeId/{employeeid}")
-    public ResponseEntity<Object> getClaimsByEmployeeId(@PathVariable int employeeid, @RequestParam String status, @RequestParam String role) {
+//    (required = false)
+    public ResponseEntity<Object> getClaimsByEmployeeId(@PathVariable int employeeid, @RequestParam(required = false) String status) {
         try {
-            ArrayList<ClaimResponse> result = claimsOp.getClaimsByEmployeeId(employeeid,status,role);
+            ClaimResponseForMultipleUser result = claimsOp.getClaimsByEmployeeId(employeeid,status);
             return ResponseHandler.generateResponse("Success got employee claims", HttpStatus.OK, result);
         } catch ( Exception |UserDefinedException e ) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
+
+
+    @GetMapping("/getClaimDetailsByClaimId/{claimid}")
+    public ResponseEntity<Object> getClaimDetailsByClaimId(@PathVariable int claimid) throws UserDefinedException {
+        try {
+            ClaimDetailResponse result = claimsOp.getClaimDetailsByClaimId(claimid);
+            return ResponseHandler.generateResponse("Success got claim details", HttpStatus.OK, result);
+        } catch ( Exception | UserDefinedException e ) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
@@ -95,10 +118,46 @@ public class ClaimController {
         try {
             String result = claimsOp.updateClaimStatus(claimUpdateRequest);
             return ResponseHandler.generateResponse("Success updated claim", HttpStatus.OK, result);
-        } catch ( Exception  e ) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+        } catch ( Exception |UserDefinedException  e ) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
 
     }
+
+    @PostMapping("/addComment")
+    public ResponseEntity<Object> claimCommentRequest(@RequestBody ClaimCommentRequest claimCommentRequest) {
+
+        try {
+            String result = claimsOp.claimCommentRequest(claimCommentRequest);
+            return ResponseHandler.generateResponse("Successfully Added Comment", HttpStatus.OK, result);
+        } catch (Exception |UserDefinedException e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
+
+    @GetMapping("/scheduleMail")
+    @Scheduled(cron = "0 0 9 * * *")
+    public ResponseEntity<Object> scheduleMail() {
+
+        try {
+            String result = claimsOp.scheduleMail();
+            return ResponseHandler.generateResponse("Successfully send Mail", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
+
+
+    @DeleteMapping("/deleteClaimUsingId/{claimId}")
+    public ResponseEntity<Object> deleteClaim(@PathVariable int claimId) {
+        try {
+            String result = claimsOp.deleteClaimUsingId(claimId);
+            return ResponseHandler.generateResponse("Success", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+
+    }
+
 
 }

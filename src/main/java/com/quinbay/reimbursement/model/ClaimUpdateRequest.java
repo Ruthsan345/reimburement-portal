@@ -7,12 +7,10 @@ import lombok.Setter;
 @Data
 @Getter
 @Setter
-//@AllArgsConstructor
 @NoArgsConstructor
-//@Builder
 public class ClaimUpdateRequest {
-    private Integer claimid;
-    private Integer Approver_id;
-    private String comment;
+    private Integer claimId;
+    private Integer ApproverId;
+    private Integer approvedClaimAmount;
     private String status;
 }

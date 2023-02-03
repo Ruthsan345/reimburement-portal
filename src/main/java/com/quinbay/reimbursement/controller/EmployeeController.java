@@ -3,16 +3,16 @@ package com.quinbay.reimbursement.controller;
 
 import com.quinbay.reimbursement.api.Employees;
 import com.quinbay.reimbursement.exception.UserDefinedException;
-import com.quinbay.reimbursement.model.CredentialRequest;
-import com.quinbay.reimbursement.model.Employee;
-import com.quinbay.reimbursement.model.EmployeeDetailResponse;
+import com.quinbay.reimbursement.model.*;
 import com.quinbay.reimbursement.response.ResponseHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@CrossOrigin(origins = "https://769b-103-224-35-103.ap.ngrok.io", maxAge = 3600)
+import java.util.ArrayList;
+
+//@CrossOrigin(origins = "https://769b-103-224-35-103.ap.ngrok.io", maxAge = 3600)
 @RequestMapping("employee/api/")
 @RestController()
 public class EmployeeController {
@@ -22,13 +22,35 @@ public class EmployeeController {
 
 
     @PostMapping("/addEmployee")
-    public ResponseEntity<Object> addEmployee(@RequestBody Employee employee) {
+    public ResponseEntity<Object> addEmployee(@RequestBody EmployeeDetailRequest employee) {
 
         try {
             String result = employeeOp.addEmployee(employee);
             return ResponseHandler.generateResponse("Successfully Added Employee", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
+
+    @PostMapping("/addRole")
+    public ResponseEntity<Object> addRole(@RequestBody RoleRequest role) {
+
+        try {
+            String result = employeeOp.addRole(role);
+            return ResponseHandler.generateResponse("Successfully Added Employee", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
+
+
+    @PutMapping("/assignEmployeeToManager")
+    public ResponseEntity<Object> assignEmployeeToManager(@RequestBody AssignEmployeeToManager employee) {
+        try {
+            String result = employeeOp.assignEmployeeToManager(employee);
+            return ResponseHandler.generateResponse("Success", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
@@ -39,7 +61,7 @@ public class EmployeeController {
             String result = employeeOp.setCredentials(login);
             return ResponseHandler.generateResponse("Successfully added the password!", HttpStatus.OK, result);
         } catch (Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
@@ -51,7 +73,7 @@ public class EmployeeController {
             EmployeeDetailResponse result = employeeOp.getEmployeeDetailsByEmail(emailId);
             return ResponseHandler.generateResponse("Success got employee details", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
@@ -61,11 +83,31 @@ public class EmployeeController {
             String result = employeeOp.authLogin(loginPojo);
             return ResponseHandler.generateResponse("Login Success", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
         }
     }
 
+    @DeleteMapping("/deleteEmployeeUsingId/{employeeid}")
+    public ResponseEntity<Object> deleteEmployee(@PathVariable int employeeid) {
+        try {
+            String result = employeeOp.deleteEmployeeUsingId(employeeid);
+            return ResponseHandler.generateResponse("Success", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
 
+    }
+
+    @GetMapping("/getAllRoles")
+    public ResponseEntity<Object> getAllRoles() {
+
+        try {
+            ArrayList<RoleResponse> result = employeeOp.getAllRoles();
+            return ResponseHandler.generateResponse("Success", HttpStatus.OK, result);
+        } catch (UserDefinedException | Exception e) {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+        }
+    }
 
 
 

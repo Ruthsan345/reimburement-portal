@@ -7,7 +7,9 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import java.sql.Date;
+
+import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Table(name = "auth")
@@ -19,22 +21,18 @@ import java.sql.Date;
 public class Login {
 
     @Id
-    @Column(name = "email",  unique = true)
-    public String email;
+    @Column(unique = true)
+    private String email;
 
-    @Column(name = "password")
-    public String password;
+    private String password;
 
-    @Column(name = "Registrationmethod")
-    public String Registrationmethod;
+    private String Registrationmethod;
 
-    @Column(name = "Lastsuccessfullogin")
-    public Date Lastsuccessfullogin;
+    private Date Lastsuccessfullogin;
 
-    @Column(name = "Lastfailedlogin")
-    public Date Lastfailedlogin;
+    private Date Lastfailedlogin;
 
-    @Column(name = "noofAtemptsPasswordFailureCount")
-    public int noofAtemptsPasswordFailureCount;
+    private int noofAtemptsPasswordFailureCount;
 
+    private boolean isdelete =false;
 }

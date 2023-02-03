@@ -1,14 +1,14 @@
 package com.quinbay.reimbursement.model;
 
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
-import org.hibernate.annotations.Type;
-import org.hibernate.annotations.TypeDef;
-
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import javax.persistence.*;
-
 import java.io.Serializable;
-import java.sql.Date;
+import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -18,55 +18,50 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class Claim {
+public class Claim implements Serializable {
 
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    Integer id;
+    @SequenceGenerator(name = "claim_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE,generator = "claim_seq")
+    private Integer id;
 
-//    @JoinColumn(name = "employeeid", nullable = false)
-    @Column(name = "employeeid")
-    public Integer employee;
+    @ManyToOne(cascade = CascadeType.ALL)
+    private Employee employee;
 
     @OneToOne
-//    @JoinColumn(name = "categoryid")
     public ClaimCategory claimCategory;
 
-//    @Column(name = "image_url", columnDefinition = "text[]")
-//    @Array(databaseType="varchar")
-//    public List<String> image_url;
-
-    @Column(name = "image_url")
     private String[] image_url;
 
-    @Column(name = "from_date")
-    public Date from_date;
+    private Date from_date;
 
-    @Column(name = "to_date")
-    public Date to_date;
+    private Date to_date;
 
-    @Column(name = "description")
-    public String description;
+    private String description;
 
-//    @ElementCollection
-    @Column(name = "office_stationary_type")
-    public String[] office_stationary_type;
+    private String[] office_stationary_type;
 
-    @Column(name = "claim_amount")
-    public double claim_amount;
+    private double claim_amount;
 
-    @Column(name = "created_by")
-    public String created_by;
+    private String created_by;
 
-    @Column(name = "created_date")
-    public Date created_date;
+    @CreationTimestamp
+    private Date created_date;
 
-    @Column(name = "updated_by")
-    public String updated_by;
+    private String updated_by;
 
-    @Column(name = "updated_date")
-    public Date updated_date;
+    @UpdateTimestamp
+    private Date updated_date;
 
+    private boolean isdelete=false;
+
+    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL)
+    @JsonManagedReference
+    public List<ClaimApproval> claimApprovals;
+
+    @OneToMany(mappedBy = "claim", cascade = CascadeType.ALL)
+    @JsonManagedReference
+    public List<ClaimComment> ClaimComment;
 
 }

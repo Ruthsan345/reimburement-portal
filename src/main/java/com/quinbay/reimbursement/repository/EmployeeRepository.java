@@ -11,12 +11,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     boolean existsByEmail(String email);
 
-    Optional<Employee> findEmployeeByEmail(String emailId);
+    Optional<Employee> findEmployeeByEmailAndIsdelete(String emailId,Boolean isDelete);
 
-    Employee findById(int empid);
+    Optional<Employee> findByIdAndIsdelete(int empid, boolean isDelete);
 
     ArrayList<Employee> findByManagerid(int employeeid);
 
-//    Wholesaler findById(int Id);
+    Employee findById(int Id);
+
+    ArrayList<Employee> findByRoleName(String role);
 
 }

@@ -1,10 +1,13 @@
 package com.quinbay.reimbursement.model;
-import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import javax.persistence.*;
-import java.sql.Date;
+import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.util.Date;
 
 
 @Entity
@@ -12,37 +15,37 @@ import java.sql.Date;
 @Data
 @Getter
 @Setter
-public class ClaimApproval {
+@NoArgsConstructor
+@AllArgsConstructor
+public class ClaimApproval implements Serializable {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    Integer id;
+    @SequenceGenerator(name = "claim_approval_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE,generator = "claim_approval_seq")
+    private Integer id;
 
-    @Column(name ="claimid")
-    public Integer claimid;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JsonBackReference
+    private Claim claim;
 
-    @Column(name = "approverid")
-    public Integer approverid;
+    private Integer approverid;
 
-    @Column(name = "level")
-    public int level;
+    private int level;
 
-    @Column(name = "status")
     public String status;
 
-    @Column(name = "approved_Amount")
-    public double approved_Amount;
+    private double approved_Amount;
 
-    @Column(name = "created_by")
-    public String created_by;
+    private String created_by;
 
-    @Column(name = "created_date")
-    public Date created_date;
+    @CreationTimestamp
+    private Date created_date;
 
-    @Column(name = "updated_by")
-    public String updated_by;
+    private String updated_by;
 
-    @Column(name = "updated_date")
-    public Date updated_date;
+    @UpdateTimestamp
+    private Date updated_date;
+
+    private boolean isdelete= false;
     
 }

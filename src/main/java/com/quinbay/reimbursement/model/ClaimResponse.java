@@ -5,28 +5,37 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.sql.Date;
 import java.util.ArrayList;
 
 
 @Data
 @Getter
 @Setter
-//@AllArgsConstructor
 @NoArgsConstructor
 public class ClaimResponse {
 
-    Integer claimId;
+    private Integer claimId;
 
-    public String employeeName;
+    private String employeeName;
 
-    public String category;
+    private String category;
 
-    public double amount;
+    private double amount;
 
-    public String description;
+    private String description;
 
-    public ArrayList<ClaimApprovalResponse> statusOfApprovers;
+    private ArrayList<ClaimApprovalResponse> statusOfApprovers;
+
+    public ClaimResponse(Integer claimId, String employeeName, String category, double amount, String description, ArrayList<ClaimApprovalResponse> statusOfApprovers) {
+        this.claimId = claimId;
+        this.employeeName = employeeName;
+        this.category = category;
+        this.amount = amount;
+        this.description = description;
+        this.statusOfApprovers = statusOfApprovers;
+    }
+
+
 
 }
 

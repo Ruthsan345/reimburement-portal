@@ -1,10 +1,13 @@
 package com.quinbay.reimbursement.model;
 
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import javax.persistence.*;
 import java.io.Serializable;
-import java.sql.Date;
+import java.time.LocalDateTime;
+import java.util.Date;
 
 
 @Entity
@@ -12,27 +15,24 @@ import java.sql.Date;
 @Data
 @Getter
 @Setter
-//@AllArgsConstructor
 @NoArgsConstructor
 public class ClaimCategory implements Serializable{
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    Integer id;
+    @SequenceGenerator(name = "claim_category_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE,generator = "claim_category_seq")
+    private Integer id;
 
-    @Column(name = "name")
-    public String name;
+    private String name;
 
-    @Column(name = "created_by")
-    public String created_by;
+    private String created_by;
 
-    @Column(name = "created_date")
-    public Date created_date;
+    @CreationTimestamp
+    private Date created_date;
 
-    @Column(name = "updated_by")
-    public String updated_by;
+    private String updated_by;
 
-    @Column(name = "updated_date")
-    public Date updated_date;
+    @UpdateTimestamp
+    private Date updated_date;
 
-
+    private boolean isdelete = false;
 }

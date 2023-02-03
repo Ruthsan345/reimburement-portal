@@ -3,35 +3,33 @@ package com.quinbay.reimbursement.model;
 import lombok.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.sql.Date;
-import java.util.List;
+import java.util.Date;
+
 
 
 @Data
 @Getter
 @Setter
-//@AllArgsConstructor
 @NoArgsConstructor
-//@Builder
 public class ClaimRequest {
 
-    Integer id;
+    private Integer id;
 
-    public int employeeid;
+    private int employeeId;
 
-    public int claimCategoryid;
+    private int claimCategoryId;
 
-    private String[] image_url;
+    private String[] imageUrl;
 
-    public Date from_date;
+    private Date fromDate;
 
-    public Date to_date;
+    private Date toDate;
 
-    public String description;
+    private String description;
 
-    public String[] office_stationary_type;
+    private String[] officeStationaryType;
 
-    public int claim_amount;
+    private int claimAmount;
 
 }
 

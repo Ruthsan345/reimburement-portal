@@ -3,9 +3,11 @@ package com.quinbay.reimbursement.service.impl;
 
 import com.quinbay.reimbursement.api.Claims;
 import com.quinbay.reimbursement.exception.UserDefinedException;
+import com.quinbay.reimbursement.kafka.KafkaPublishService;
 import com.quinbay.reimbursement.model.*;
 import com.quinbay.reimbursement.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,8 +15,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ClaimOperation implements Claims {
@@ -34,326 +36,284 @@ public class ClaimOperation implements Claims {
     @Autowired
     ClaimCommentRepository claimCommentRepository;
 
-    java.sql.Date date;
-    long millis=System.currentTimeMillis();
+    @Autowired
+    KafkaPublishService kafkaPublishService;
+
 
     @Override
     public String addClaimCategory(ClaimCategory claimCategory) {
         claimCategoryRepository.save(claimCategory);
-
         return "Claim Category added";
     }
 
     @Override
-    public ArrayList<ClaimCategory> getAllCategories() throws UserDefinedException {
-
+    public ArrayList<ClaimCategoryResponse> getAllCategories() throws UserDefinedException {
         ArrayList<ClaimCategory> claimCategories = (ArrayList<ClaimCategory>) claimCategoryRepository.findAll();
-        if(claimCategories.isEmpty()){
+
+        if (claimCategories.isEmpty()) {
             throw new UserDefinedException("Categories not found");
-        }else{
-            return claimCategories;
+        } else {
+            ArrayList<ClaimCategoryResponse> claimCategoryResponses = claimCategories.stream()
+                    .map(f -> new ClaimCategoryResponse(f.getId(), f.getName()))
+                    .collect(Collectors.toCollection(ArrayList::new));
+            return claimCategoryResponses;
         }
     }
+    public int getfinancierIdBasedOnRequest(String role){
+        ArrayList<Employee> employeesIfFinancier = employeeRepository.findByRoleName(role);
+        int value;
+        HashMap<Integer, Integer> employeeCountMap = new HashMap<>();
+        for(Employee employee : employeesIfFinancier){
+            value = claimApprovalRepository.countByApproveridAndStatus(employee.getId(),"PENDING");
+            employeeCountMap.put(employee.getId(), value);
+        }
+        int maxKey = employeeCountMap.keySet().stream()
+                .min(Comparator.comparing(employeeCountMap::get))
+                .orElse(null);
+        return maxKey;
+        }
 
     @Override
-    public String addClaim(ClaimRequest claimRequest) {
-        Claim claims = new Claim();
-        try {
-            ClaimCategory cat = claimCategoryRepository.findById(claimRequest.getClaimCategoryid());
-            Employee employee = employeeRepository.findById(claimRequest.getEmployeeid());
-            claims.setEmployee(claimRequest.getEmployeeid());
+    public String addClaim(ClaimRequest claimRequest) throws UserDefinedException {
+            Claim claims = new Claim();int managerId;
+            ClaimCategory cat = claimCategoryRepository.findByIdAndIsdelete(claimRequest.getClaimCategoryId(), false);
+            Employee employee = employeeRepository.findByIdAndIsdelete(claimRequest.getEmployeeId(), false).orElseThrow(()-> new UserDefinedException("Employee not found"));
+            claims.setEmployee(employee);
             claims.setClaimCategory(cat);
             claims.setDescription(claimRequest.getDescription());
-            claims.setClaim_amount(claimRequest.getClaim_amount());
-            claims.setFrom_date(claimRequest.getFrom_date());
-            claims.setTo_date(claimRequest.getTo_date());
-            claims.setOffice_stationary_type(claimRequest.getOffice_stationary_type());
-            claims.setImage_url(claimRequest.getImage_url());
-            Claim claim =claimRepository.save(claims);
-
+            claims.setClaim_amount(claimRequest.getClaimAmount());
+            claims.setFrom_date(claimRequest.getFromDate());
+            claims.setTo_date(claimRequest.getToDate());
+            claims.setOffice_stationary_type(claimRequest.getOfficeStationaryType());
+            claims.setImage_url(claimRequest.getImageUrl());
+            Claim claim = claimRepository.save(claims);
             ClaimApproval claimApproval = new ClaimApproval();
             ClaimApproval claimApproval1 = new ClaimApproval();
-
-            claimApproval.setApproverid(employee.getManagerid());
-            claimApproval.setClaimid(claim.getId());
+            if(employee.getRole().getName().equals("EMPLOYEE") || employee.getRole().getName().equals("MANAGER")) {
+                Employee managerDetails = employeeRepository.findById(employee.getManagerid()).orElseThrow(()-> new UserDefinedException("Manager not found"));
+                if(managerDetails.getRole().getThreshold()<claimRequest.getClaimAmount()){
+                    managerId = managerDetails.getManagerid();
+                }else{ managerId=employee.getManagerid(); }
+            }
+            else{ managerId = employee.getManagerid(); }
+            claimApproval.setApproverid(managerId);
+            claimApproval.setClaim(claim);
             claimApproval.setLevel(1);
             claimApproval.setStatus("PENDING");
-
-            claimApproval1.setClaimid(claim.getId());
+            claimApproval1.setApproverid(getfinancierIdBasedOnRequest("FINANCIER"));
+            claimApproval1.setClaim(claim);
             claimApproval1.setLevel(2);
             claimApproval1.setStatus("PENDING");
-
             claimApprovalRepository.save(claimApproval);
             claimApprovalRepository.save(claimApproval1);
-
-
-        }catch (Exception e){
-            System.out.print(e);
-        }
         return "Claim added successfully";
     }
 
     @Override
     public ArrayList<Claim> getAllClaims() throws UserDefinedException {
-        ArrayList<Claim> claims = (ArrayList<Claim>) claimRepository.findAll();
-        if(claims.isEmpty()){
+        ArrayList<Claim> claims = claimRepository.findByIsdelete(false);
+        if (claims.isEmpty()) {
             throw new UserDefinedException("claims not found");
-        }else{
+        } else {
             return claims;
         }
     }
 
     @Override
-    public String addClaimUsingImage(ClaimRequest claimRequest, List<MultipartFile> files) throws IOException {
-
-        String[] image_url={};
-        String arrNew[] = Arrays.copyOf(image_url, image_url.length + 1);
-        int i =0;
-
-        for (MultipartFile file : files) {
-            String fileName = new SimpleDateFormat("yyyyMMddHHmm'.jpg'").format(new Date());
-            byte[] bytes = file.getBytes();
-            Path path = Paths.get("./image/" + fileName);
-            Files.write(path, bytes);
-            image_url[i]= fileName;
-            i++;
+    public String addClaimUsingImage(MultipartFile[] files, int claimId) throws UserDefinedException {
+        List<String> fileNames = new ArrayList<>();
+        Arrays.asList(files).stream().forEach(file -> {
+            try {
+                String fileName = "images/" + System.currentTimeMillis() + ".jpg";
+                byte[] bytes = new byte[0];
+                bytes = file.getBytes();
+                Path path = Paths.get("./src/main/resources/static/" + fileName);
+                Files.write(path, bytes);
+                fileNames.add(fileName);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        String[] image_url = new String[fileNames.size()];
+        for (int i = 0; i < fileNames.size(); i++) {
+            image_url[i] = fileNames.get(i);
         }
-        for(String s: image_url)
-            System.out.print("\n\n------------------add claim using"+s);
+        Claim claim = claimRepository.findByIdAndIsdelete(claimId,false).orElseThrow(()-> new UserDefinedException("Claim not found"));
+        claim.setImage_url(image_url);
+        claimRepository.save(claim);
+        return "Successfully added the image for claim id : "+claimId;
+    }
+
+    public ArrayList<Claim> getClaimsByStatus(ArrayList<Claim> claims, String status){
+        ArrayList<Claim> claimByStatus = claims.stream()
+                .filter(claim -> claim.claimApprovals.stream()
+                        .anyMatch(approval -> approval.getStatus().equals(status)))
+                .collect(Collectors.toCollection(ArrayList::new));
+        return claimByStatus;
+    }
+
+    public ArrayList<ClaimResponse> getClaimResponseFromClaim(ArrayList<Claim> claims){
+        ArrayList<ClaimResponse> claimResponse = new ArrayList<ClaimResponse>();
+        for (Claim claim : claims) {
+            ArrayList<ClaimApprovalResponse> claimApprovalResponses = claim.getClaimApprovals().stream()
+                    .map(f -> new ClaimApprovalResponse(f.getApproverid(), f.getLevel(), f.getStatus()))
+                    .sorted(Comparator.comparing(ClaimApprovalResponse::getLevel))
+                    .collect(Collectors.toCollection(ArrayList::new));
+            ClaimResponse response = new ClaimResponse(claim.getId(), claim.getEmployee().getName(), claim.getClaimCategory().getName(), claim.getClaim_amount(), claim.getDescription(), claimApprovalResponses);
+            claimResponse.add(response);
+        }
+        return  claimResponse;
+    }
+
+    public ArrayList<ClaimResponse> getClaimFromApproverId(int approverId, String status){
+        ArrayList<ClaimApproval> claimApprovals = claimApprovalRepository.findByApproveridAndIsdelete(approverId, false);
+        ArrayList<Claim> claimsByApprovalId = claimApprovals.stream().map(f-> f.getClaim()).collect(Collectors.toCollection(ArrayList::new));
+           if(status==null){
+               return getClaimResponseFromClaim(claimsByApprovalId);
+           }else{
+               return getClaimResponseFromClaim(getClaimsByStatus(claimsByApprovalId,status));
+           }
+    }
+
+    @Override
+    public ClaimResponseForMultipleUser getClaimsByEmployeeId(int employeeid, String status) throws UserDefinedException {
+        ArrayList<Claim> claims = claimRepository.findByIsdeleteAndEmployeeId(false,employeeid);
+        Employee employee = employeeRepository.findByIdAndIsdelete(employeeid, false).orElseThrow(()-> new UserDefinedException("Employee not found"));
+        ClaimResponseForMultipleUser claimResponseForMultipleUser = new ClaimResponseForMultipleUser();
+            if(status==null) {
+                claimResponseForMultipleUser.setMyClaims(getClaimResponseFromClaim(claims));
+                    ArrayList<Claim> claimsByEmployee = claimRepository.findByIsdeleteAndEmployeeManagerid(false,employeeid);
+                    ArrayList<ClaimResponse> claimResponses =getClaimResponseFromClaim(claimsByEmployee);
+                    claimResponses.addAll(getClaimFromApproverId(employeeid, status));
+                    claimResponses = getUniqueClaimResponses(claimResponses);
+                    claimResponseForMultipleUser.setEmployeeClaims(claimResponses);
+            } else{
+                ArrayList<Claim> claimsByStatus = getClaimsByStatus(claims, status);
+                claimResponseForMultipleUser.setMyClaims(getClaimResponseFromClaim(claimsByStatus));
+                    ArrayList<Claim> claimsByEmployee = claimRepository.findByIsdeleteAndEmployeeManagerid(false,employeeid);
+                    ArrayList<Claim> claimsByStatusForEmployee = getClaimsByStatus(claimsByEmployee, status);
+                    ArrayList<ClaimResponse> claimResponses =getClaimResponseFromClaim(claimsByStatusForEmployee);
+                    claimResponses.addAll(getClaimFromApproverId(employeeid, status));
+                    claimResponses = getUniqueClaimResponses(claimResponses);
+                    claimResponseForMultipleUser.setEmployeeClaims(claimResponses);
+            }
+            return claimResponseForMultipleUser;
+        }
+
+    private ArrayList<ClaimResponse> getUniqueClaimResponses(ArrayList<ClaimResponse> claimResponses) {
+        return claimResponses.stream().distinct().collect(Collectors.toCollection(ArrayList::new));
+    }
+
+
+    @Override
+    public String updateClaimStatus(ClaimUpdateRequest claimUpdateRequest) throws UserDefinedException {
+        int empid = claimUpdateRequest.getApproverId();
+        Employee employee = employeeRepository.findByIdAndIsdelete(empid, false).orElseThrow(()-> new UserDefinedException("Employee not found"));;
+        ArrayList<ClaimApproval> claimApproval = claimApprovalRepository.findByClaimId(claimUpdateRequest.getClaimId()).orElseThrow(()-> new UserDefinedException("claim id not found"));
+        if(claimApproval.isEmpty()){throw new UserDefinedException("claim id not found");}
+        if (employee.getRole().equals("EMPLOYEE")) {throw new UserDefinedException("Employee cannot update status");}
+            for (ClaimApproval ca : claimApproval) {
+                if(ca.getApproverid() == claimUpdateRequest.getApproverId() ){
+                    if (ca.getLevel() == 1 && claimApproval.stream().anyMatch(app -> app.getLevel() == 2 && app.getStatus().equals("APPROVED") || app.getStatus().equals("REJECTED"))) {
+                       throw new UserDefinedException("Cannot update status, financier has already approved/Rejected, ");
+                    } else {
+                        if(ca.getLevel()==2){
+                            String status = claimUpdateRequest.getStatus();
+                            claimApproval.stream().filter(app -> app.getLevel() == 1).forEach(app -> app.setStatus(status));
+                        }
+                        ca.setApproved_Amount(claimUpdateRequest.getApprovedClaimAmount());
+                        ca.setStatus(claimUpdateRequest.getStatus());
+                        claimApprovalRepository.save(ca);
+                        Mailer mail =new Mailer(claimRepository.findEmployeMailByClaimId(claimUpdateRequest.getClaimId()),"Your Claim number : "+claimUpdateRequest.getClaimId()+". has been "+claimUpdateRequest.getStatus()+".");
+                        kafkaPublishService.sendMailingInformation(mail);
+                        return "claim request : " + claimUpdateRequest.getClaimId() + " is " + claimUpdateRequest.getStatus();
+                    }
+                }
+            }
+        return "Error updating the status.";
+    }
+
+    @Override
+    public ClaimDetailResponse getClaimDetailsByClaimId(int claimId) throws UserDefinedException {
+        Claim claimDetail = claimRepository.findByIdAndIsdelete(claimId, false).orElseThrow(()-> new UserDefinedException("Claim not found"));
+        List<ClaimComment> claimComments =  claimDetail.getClaimComment();
+        ArrayList<ClaimApprovalResponse> claimApprovalResponses = new ArrayList<ClaimApprovalResponse>();
+        ClaimDetailResponse response = new ClaimDetailResponse(claimDetail.getId(),claimDetail.getEmployee().getName(),claimDetail.claimCategory.getName(),claimDetail.getImage_url(),claimDetail.getFrom_date(),claimDetail.getTo_date(),claimDetail.getOffice_stationary_type(),claimDetail.getDescription(),claimDetail.getClaim_amount(),claimDetail.getCreated_date());
+        ArrayList<ClaimCommentsResponse> claimCommentsResponse = new ArrayList<ClaimCommentsResponse>();
+        for (ClaimComment cc : claimComments) {
+            ClaimCommentsResponse claimcomm = new ClaimCommentsResponse(cc.getComments(),cc.getEmployeeid(),employeeRepository.findByIdAndIsdelete(cc.getEmployeeid(), false).orElseThrow(()-> new UserDefinedException("Employee not found")).getName(),cc.getDate());
+            claimCommentsResponse.add(claimcomm);
+        }
+        response.setClaimCommentsResponses(claimCommentsResponse);
+        ArrayList<ClaimApproval> claimApproval = claimApprovalRepository.findByClaimId(claimId).orElseThrow(()-> new UserDefinedException("claim id not found"));
+        for (ClaimApproval ca : claimApproval) {
+            ClaimApprovalResponse car = new ClaimApprovalResponse(ca.getApproverid(),ca.getLevel(),ca.getStatus());
+            claimApprovalResponses.add(car);
+        }
+        response.setStatusOfApprovers(claimApprovalResponses);
+        return response;
+    }
+
+    @Override
+    public String claimCommentRequest(ClaimCommentRequest claimCommentRequest) throws UserDefinedException {
+        Claim claim = claimRepository.findById(claimCommentRequest.getClaimId()).orElseThrow(()-> new UserDefinedException("claim id not found"));;
+        ClaimComment claimComment = new ClaimComment();
+        claimComment.setClaim(claim);
+        claimComment.setComments(claimCommentRequest.getComments());
+        employeeRepository.findByIdAndIsdelete(claimCommentRequest.getEmployeeId(),false).orElseThrow(()-> new UserDefinedException("employee not found"));
+        claimComment.setEmployeeid(claimCommentRequest.getEmployeeId());
+        claimCommentRepository.save(claimComment);
+        String mail = claimRepository.findEmployeMailByClaimId(claimCommentRequest.getClaimId());
+        Mailer mailer = new Mailer(mail, "A New comment is added to your claim no :" + claimCommentRequest.getClaimId());
+        kafkaPublishService.sendMailingInformation(mailer);
+        return "comment added to the claim sucessfully";
+    }
+
+    @Override
+    public String scheduleMail() throws UserDefinedException {
+        ArrayList<ClaimApproval> claimApproval = claimApprovalRepository.findByStatus("PENDING");
+        try {
+            List<Mailer> mailerList = new ArrayList<Mailer>();
+            for (ClaimApproval ca : claimApproval) {
+                if (ca.getApproverid() != null) {
+                    int approverId = ca.getApproverid();
+                    Employee emp = employeeRepository.findByIdAndIsdelete(approverId, false).orElseThrow(()-> new UserDefinedException("Employee not found"));
+                    String empMail = emp.getEmail();
+                    Mailer mailInfo = new Mailer();
+                    mailInfo.setMailId(empMail);
+                    mailInfo.setMessage("You have a pending claim to review \n Claim id is : " + ca.getClaim().getId());
+                    mailerList.add(mailInfo);
+                }
+            }
+            System.out.print(mailerList);
+            kafkaPublishService.sendScheduledMail(mailerList);
+        } catch (Exception e) {
+            System.out.print(e);
+        }
+        return "Success";
+    }
+
+    @Override
+    public String deleteClaimUsingId(int claimId) throws UserDefinedException {
+        Claim claimDetail = claimRepository.findByIdAndIsdelete(claimId, false).orElseThrow(()-> new UserDefinedException("Claim not found"));
+        try {
+                if (claimDetail.isIsdelete()) {
+                    throw new UserDefinedException("Claim already deleted ");
+                } else {
+                    ArrayList<ClaimApproval> claimApprovals = claimApprovalRepository.findByClaimId(claimId).orElseThrow(()-> new UserDefinedException("claim id not found"));
+                    for (ClaimApproval ca : claimApprovals) {
+                        ca.setIsdelete(true);
+                        claimApprovalRepository.save(ca);
+                    }
+                    claimDetail.setIsdelete(true);
+                    claimRepository.save(claimDetail);
+                    return "Deleted Successfully ";
+                }
+            }
+        catch (Exception e) {
+            System.out.print(e);
+        }
         return null;
     }
 
-    @Override
-    public ArrayList<ClaimResponse> getClaimsByEmployeeId(int employeeid, String status, String role) throws UserDefinedException {
-        ArrayList<ClaimResponse> claimResponse = new ArrayList<ClaimResponse>();
-        if(role.equals("EMPLOYEE")){
-//           Employee employee = employeeRepository.findById(employeeid);
-           ArrayList<Claim> claim = claimRepository.findByEmployee(employeeid);
-
-            for(Claim c: claim){
-                ClaimResponse response =  new ClaimResponse();
-
-                ArrayList<ClaimApprovalResponse> claimApprovalResponses = new ArrayList<ClaimApprovalResponse>();
-               ArrayList<ClaimApproval> claimApproval= claimApprovalRepository.findByClaimid(c.getId());
-
-              for(ClaimApproval ca: claimApproval){
-                  ClaimApprovalResponse car = new ClaimApprovalResponse();
-                  car.setApproverid(ca.getApproverid());
-                  car.setLevel(ca.getLevel());
-                  car.setStatus(ca.getStatus());
-                  claimApprovalResponses.add(car);
-                  if(status.equals("PENDING")) {
-                      System.out.print(ca.status);
-                      if (ca.getStatus().equals(status)) {
-                          System.out.print(ca.status);
-                          response.setClaimId(c.getId());
-                          response.setCategory(c.claimCategory.getName());
-                          response.setDescription(c.getDescription());
-                          response.setAmount(c.getClaim_amount());
-                          response.setStatusOfApprovers(claimApprovalResponses);
-                      }
-                  }
-                  if(status.equals("APPROVED")){
-                      if(ca.getLevel()==2 && ca.getStatus().equals("APPROVED")){
-                          response.setClaimId(c.getId());
-                          response.setCategory(c.claimCategory.getName());
-                          response.setDescription(c.getDescription());
-                          response.setAmount(c.getClaim_amount());
-                          response.setStatusOfApprovers(claimApprovalResponses);
-                      }
-                  }
-                  if(status.equals( "REJECTED")){
-                      if(ca.getStatus().equals("REJECTED")){
-                          response.setClaimId(c.getId());
-                          response.setCategory(c.claimCategory.getName());
-                          response.setDescription(c.getDescription());
-                          response.setAmount(c.getClaim_amount());
-                          response.setStatusOfApprovers(claimApprovalResponses);
-                      }
-                  }
-              }
-                if(response.getClaimId()!=null){
-                    claimResponse.add(response);
-                }
-           }
-
-
-        }
-        else if(role.equals("MANAGER")){
-            Employee employee = employeeRepository.findById(employeeid);
-           if( employee.getRole().equals("MANAGER")) {
-               ArrayList<Employee> employees = employeeRepository.findByManagerid(employeeid);
-
-               for(Employee e: employees){
-                   ArrayList<Claim> claim = claimRepository.findByEmployee(e.getId());
-
-
-                   for(Claim c: claim){
-                       ClaimResponse response =  new ClaimResponse();
-
-                       ArrayList<ClaimApprovalResponse> claimApprovalResponses = new ArrayList<ClaimApprovalResponse>();
-                       ArrayList<ClaimApproval> claimApproval= claimApprovalRepository.findByClaimid(c.getId());
-
-                       for(ClaimApproval ca: claimApproval){
-                           ClaimApprovalResponse car = new ClaimApprovalResponse();
-                           car.setApproverid(ca.getApproverid());
-                           car.setLevel(ca.getLevel());
-                           car.setStatus(ca.getStatus());
-                           claimApprovalResponses.add(car);
-                           if(status.equals("PENDING")) {
-                               System.out.print(ca.status);
-                               if (ca.getStatus().equals(status)) {
-                                   System.out.print(ca.status);
-                                   response.setClaimId(c.getId());
-                                   response.setEmployeeName(e.getName());
-                                   response.setCategory(c.claimCategory.getName());
-                                   response.setDescription(c.getDescription());
-                                   response.setAmount(c.getClaim_amount());
-                                   response.setStatusOfApprovers(claimApprovalResponses);
-                               }
-                           }
-                           if(status.equals("APPROVED")){
-                               if(ca.getLevel()==2 && ca.getStatus().equals("APPROVED")){
-                                   response.setClaimId(c.getId());
-                                   response.setCategory(c.claimCategory.getName());
-                                   response.setDescription(c.getDescription());
-                                   response.setEmployeeName(e.getName());
-                                   response.setAmount(c.getClaim_amount());
-                                   response.setStatusOfApprovers(claimApprovalResponses);
-                               }
-                           }
-                           if(status.equals( "REJECTED")){
-                               if(ca.getStatus().equals("REJECTED")){
-                                   response.setClaimId(c.getId());
-                                   response.setCategory(c.claimCategory.getName());
-                                   response.setDescription(c.getDescription());
-                                   response.setEmployeeName(e.getName());
-                                   response.setAmount(c.getClaim_amount());
-                                   response.setStatusOfApprovers(claimApprovalResponses);
-                               }
-                           }
-                       }
-                       if(response.getClaimId()!=null){
-                           claimResponse.add(response);
-                       }
-                   }
-
-               }
-
-           }else{
-               throw new UserDefinedException("You're not a manager");
-           }
-        }
-        else if(role.equals("FINANCIER")){
-            Employee employee = employeeRepository.findById(employeeid);
-            if( employee.getRole().equals("FINANCIER")) {
-
-
-                ArrayList<Claim> claim = (ArrayList<Claim>) claimRepository.findAll();
-
-                for(Claim c: claim){
-                    ClaimResponse response =  new ClaimResponse();
-                    int id =c.getEmployee();
-                    Employee emp = employeeRepository.findById(id);
-
-                    ArrayList<ClaimApprovalResponse> claimApprovalResponses = new ArrayList<ClaimApprovalResponse>();
-                    ArrayList<ClaimApproval> claimApproval= claimApprovalRepository.findByClaimid(c.getId());
-
-                    for(ClaimApproval ca: claimApproval){
-                        ClaimApprovalResponse car = new ClaimApprovalResponse();
-                        car.setApproverid(ca.getApproverid());
-                        car.setLevel(ca.getLevel());
-                        car.setStatus(ca.getStatus());
-                        claimApprovalResponses.add(car);
-                        if(status.equals("PENDING")) {
-                            System.out.print(ca.status);
-                            if (ca.getLevel()==1 && ca.getStatus().equals("APPROVED")) {
-                                System.out.print(ca.status);
-                                response.setClaimId(c.getId());
-                                response.setEmployeeName(emp.getName());
-                                response.setCategory(c.claimCategory.getName());
-                                response.setDescription(c.getDescription());
-                                response.setAmount(c.getClaim_amount());
-                                response.setStatusOfApprovers(claimApprovalResponses);
-                            }
-                        }
-                        if(status.equals("APPROVED")){
-                            if(ca.getLevel()==2 && ca.getStatus().equals("APPROVED")){
-                                response.setClaimId(c.getId());
-                                response.setCategory(c.claimCategory.getName());
-                                response.setEmployeeName(emp.getName());
-                                response.setDescription(c.getDescription());
-                                response.setAmount(c.getClaim_amount());
-                                response.setStatusOfApprovers(claimApprovalResponses);
-                            }
-                        }
-                        if(status.equals( "REJECTED")){
-                            if(ca.getStatus().equals("REJECTED")){
-                                response.setClaimId(c.getId());
-                                response.setCategory(c.claimCategory.getName());
-                                response.setEmployeeName(emp.getName());
-                                response.setDescription(c.getDescription());
-                                response.setAmount(c.getClaim_amount());
-                                response.setStatusOfApprovers(claimApprovalResponses);
-                            }
-                        }
-                    }
-                    if(response.getClaimId()!=null){
-                        claimResponse.add(response);
-                    }
-                }
-
-
-            }
-            else{
-                throw new UserDefinedException("You're not a Financier");
-            }
-
-
-        }
-
-        return claimResponse;
-    }
-
-    @Override
-    public String updateClaimStatus(ClaimUpdateRequest claimUpdateRequest) {
-        date=new java.sql.Date(millis);
-        int empid= claimUpdateRequest.getApprover_id();
-        Employee employee = employeeRepository.findById(empid);
-//        ArrayList<ClaimApproval> claimApproval= claimApprovalRepository.findByApproverid(empid);
-        ArrayList<ClaimApproval> claimApproval= claimApprovalRepository.findByClaimid(claimUpdateRequest.getClaimid());
-        for(ClaimApproval ca: claimApproval){
-            System.out.print(ca.getLevel()+"---------------->");
-            if(ca.getApproverid()==empid) {
-                System.out.print(ca.status+"---check 1------------->");
-
-                ca.setStatus(claimUpdateRequest.getStatus());
-            }
-            else {
-                System.out.print(ca.status+"------check 2---------->");
-
-                ca.setStatus(claimUpdateRequest.getStatus());
-            }
-            System.out.print(ca.status+"-------check 3--------->");
-            ClaimApproval claimApproval2 = claimApprovalRepository.save(ca);
-
-        }
-
-        try {
-            ClaimComments claimComments = new ClaimComments();
-
-            claimComments.setClaimid(claimUpdateRequest.getClaimid());
-            claimComments.setComments(claimUpdateRequest.getComment());
-            claimComments.setEmployeeid(empid);
-            claimComments.setDate(date);
-
-            ClaimComments res = claimCommentRepository.save(claimComments);
-
-            System.out.print(res.getId() + "" + res + "------------->");
-        }
-        catch (Exception e){
-            System.out.print(e);
-        }
-        return "claim request : "+claimUpdateRequest.getClaimid()+" is "+claimUpdateRequest.getStatus();
-    }
 }

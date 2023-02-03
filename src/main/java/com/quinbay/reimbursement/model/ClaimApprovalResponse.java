@@ -1,15 +1,15 @@
 package com.quinbay.reimbursement.model;
 
 
-import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Data
 @Getter
 @Setter
+@AllArgsConstructor
+@NoArgsConstructor
 public class ClaimApprovalResponse {
-    public Integer approverid;
-    public int level;
-    public String status;
+    private Integer approverId;
+    private int level;
+    private String status;
 }
