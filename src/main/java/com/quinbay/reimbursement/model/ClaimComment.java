@@ -24,7 +24,7 @@ public class ClaimComment implements Serializable {
     @GeneratedValue(strategy = GenerationType.SEQUENCE,generator = "claim_comment_seq")
     private Integer id;
 
-    @ManyToOne( fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne( fetch = FetchType.EAGER)
     @JsonBackReference
     private Claim claim;
 

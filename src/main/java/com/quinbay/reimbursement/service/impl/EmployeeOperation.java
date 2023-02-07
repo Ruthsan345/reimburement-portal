@@ -32,12 +32,15 @@ public class EmployeeOperation implements Employees {
 
     @Override
     public String addEmployee(EmployeeDetailRequest employee) throws UserDefinedException {
-            if(employeeRepository.existsByEmail(employee.getEmail())){throw new UserDefinedException("Email Already Exists");}
+            if(employeeRepository.existsByAuthEmail(employee.getEmail())){throw new UserDefinedException("Email Already Exists");}
             Role role = roleRepository.findByName(employee.getRole()).orElseThrow(() -> new UserDefinedException("Role not found"));
-            Employee newEmployee = new Employee(employee.getName(),employee.getPhone(),employee.getEmail(),employee.getJobTitle(),role,employee.getManagerId());
-            Employee createdAccount = employeeRepository.save(newEmployee);
+
             CredentialRequest credentialRequest = new CredentialRequest(employee.getEmail(),employee.getPassword());
-            setCredentials(credentialRequest);
+            Login login = saveCredentials(credentialRequest);
+
+            Employee newEmployee = new Employee(employee.getName(),employee.getPhone(),login,employee.getJobTitle(),role,employee.getManagerId());
+            Employee createdAccount = employeeRepository.save(newEmployee);
+
             return "Account creation success! Your employee ID : "+createdAccount.getId();
     }
 
@@ -53,12 +56,23 @@ public class EmployeeOperation implements Employees {
         return "Password set for :"+login.getEmail();
     }
 
+    public Login saveCredentials(CredentialRequest loginPojo) {
+        String encodedPassword = passwordEncoder.encode(loginPojo.getPassword());
+        Login login = new Login();
+        login.setEmail(loginPojo.getEmail());
+        login.setRegistrationmethod("GENERAL");
+        login.setNoofAtemptsPasswordFailureCount(0);
+        login.setPassword(encodedPassword);
+        login = loginRepository.save(login);
+        return login;
+    }
+
     @Override
     public EmployeeDetailResponse getEmployeeDetailsByEmail(String emailId) throws UserDefinedException {
 
-        Employee employee = employeeRepository.findEmployeeByEmailAndIsdelete(emailId,false).orElseThrow(() -> new UserDefinedException("Employee details not found"));
+        Employee employee = employeeRepository.findEmployeeByIsdeleteAndAuthEmail(false,emailId).orElseThrow(() -> new UserDefinedException("Employee details not found"));
         EmployeeDetailResponse employeeDetailResponse = new EmployeeDetailResponse() ;
-        employeeDetailResponse.setEmail(employee.getEmail());
+        employeeDetailResponse.setEmail(employee.getAuth().getEmail());
         employeeDetailResponse.setId(employee.getId());
         employeeDetailResponse.setJobTitle(employee.getJob_title());
         employeeDetailResponse.setManagerId(employee.getManagerid());
@@ -73,8 +87,8 @@ public class EmployeeOperation implements Employees {
     @Override
     public String authLogin(CredentialRequest loginRequest) throws UserDefinedException {
        Login login= loginRepository.findByEmailAndIsdelete(loginRequest.getEmail(),false).orElseThrow(()-> new UserDefinedException("Invalid Email id"));
-       System.out.print(login.getPassword()+""+loginRequest.getPassword());
-       System.out.print(passwordEncoder.matches(loginRequest.getPassword(),login.getPassword()));
+//       System.out.print(login.getPassword()+""+loginRequest.getPassword());
+//       System.out.print(passwordEncoder.matches(loginRequest.getPassword(),login.getPassword()));
         Date date = new Date();
         if (passwordEncoder.matches(loginRequest.getPassword(), login.getPassword())) {
             login.setLastsuccessfullogin(date);
@@ -91,7 +105,7 @@ public class EmployeeOperation implements Employees {
     @Override
     public String deleteEmployeeUsingId(int empId) throws UserDefinedException {
         Employee employee =employeeRepository.findById(empId);
-        String mailId= employee.getEmail();
+        String mailId= employee.getAuth().getEmail();
         if(employee.isIsdelete()){
             throw new UserDefinedException("Employee already Deleted");
         }else {
@@ -106,7 +120,7 @@ public class EmployeeOperation implements Employees {
 
     @Override
     public String assignEmployeeToManager(AssignEmployeeToManager employee) throws UserDefinedException {
-        Employee employeeDetail = employeeRepository.findEmployeeByEmailAndIsdelete(employee.getEmployeeEmail(),false).orElseThrow(() -> new UserDefinedException("Employee details not found"));
+        Employee employeeDetail = employeeRepository.findEmployeeByIsdeleteAndAuthEmail(false, employee.getEmployeeEmail()).orElseThrow(() -> new UserDefinedException("Employee details not found"));
 
         employeeDetail.setManagerid(employee.getManagerId());
 

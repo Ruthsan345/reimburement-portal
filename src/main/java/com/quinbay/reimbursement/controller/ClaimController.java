@@ -48,7 +48,7 @@ public class ClaimController {
     public ResponseEntity<Object> addClaim(@RequestBody ClaimRequest claim) {
 
         try {
-            String result = claimsOp.addClaim(claim);
+            Integer result = claimsOp.addClaim(claim);
             return ResponseHandler.generateResponse("Successfully Added claim", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
             return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
@@ -84,30 +84,32 @@ public class ClaimController {
             ArrayList<Claim> result = claimsOp.getAllClaims();
             return ResponseHandler.generateResponse("Success got categories", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
     }
 
 
-    @GetMapping("/getClaimsByEmployeeId/{employeeid}")
-//    (required = false)
-    public ResponseEntity<Object> getClaimsByEmployeeId(@PathVariable int employeeid, @RequestParam(required = false) String status) {
+    @GetMapping("/getClaimsByEmployeeId/{employeeId}")
+    public ResponseEntity<Object> getClaimsByEmployeeId(@PathVariable int employeeId,
+                                                        @RequestParam(required = false) String status,
+                                                        @RequestParam(defaultValue = "0") Integer pageNo,
+                                                        @RequestParam(defaultValue = "5") Integer pageSize) {
         try {
-            ClaimResponseForMultipleUser result = claimsOp.getClaimsByEmployeeId(employeeid,status);
+            ClaimResponseForMultipleUser result = claimsOp.getClaimsByEmployeeId(employeeId,status, pageNo, pageSize);
             return ResponseHandler.generateResponse("Success got employee claims", HttpStatus.OK, result);
         } catch ( Exception |UserDefinedException e ) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
     }
 
 
-    @GetMapping("/getClaimDetailsByClaimId/{claimid}")
-    public ResponseEntity<Object> getClaimDetailsByClaimId(@PathVariable int claimid) throws UserDefinedException {
+    @GetMapping("/getClaimDetailsByClaimId/{claimId}")
+    public ResponseEntity<Object> getClaimDetailsByClaimId(@PathVariable int claimId) throws UserDefinedException {
         try {
-            ClaimDetailResponse result = claimsOp.getClaimDetailsByClaimId(claimid);
+            ClaimDetailResponse result = claimsOp.getClaimDetailsByClaimId(claimId);
             return ResponseHandler.generateResponse("Success got claim details", HttpStatus.OK, result);
         } catch ( Exception | UserDefinedException e ) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
     }
 
@@ -119,7 +121,7 @@ public class ClaimController {
             String result = claimsOp.updateClaimStatus(claimUpdateRequest);
             return ResponseHandler.generateResponse("Success updated claim", HttpStatus.OK, result);
         } catch ( Exception |UserDefinedException  e ) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
 
     }
@@ -131,7 +133,7 @@ public class ClaimController {
             String result = claimsOp.claimCommentRequest(claimCommentRequest);
             return ResponseHandler.generateResponse("Successfully Added Comment", HttpStatus.OK, result);
         } catch (Exception |UserDefinedException e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
     }
 
@@ -143,7 +145,7 @@ public class ClaimController {
             String result = claimsOp.scheduleMail();
             return ResponseHandler.generateResponse("Successfully send Mail", HttpStatus.OK, result);
         } catch (UserDefinedException | Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.MULTI_STATUS, null);
         }
     }
 

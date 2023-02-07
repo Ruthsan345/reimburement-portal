@@ -26,8 +26,8 @@ public class Employee implements Serializable {
 
     private Double phone;
 
-    @Column(unique = true)
-    private String email;
+    @OneToOne
+    private Login auth;
 
     private String job_title;
 
@@ -48,10 +48,10 @@ public class Employee implements Serializable {
 
     private boolean isdelete=false;
 
-    public Employee(String name, Double phone, String email, String job_title, Role role, Integer managerid) {
+    public Employee(String name, Double phone, Login login, String job_title, Role role, Integer managerid) {
         this.name = name;
         this.phone = phone;
-        this.email = email;
+        this.auth = login;
         this.job_title = job_title;
         this.role = role;
         this.managerid = managerid;

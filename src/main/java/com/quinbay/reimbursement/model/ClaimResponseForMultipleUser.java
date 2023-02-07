@@ -16,4 +16,11 @@ public class ClaimResponseForMultipleUser {
     private ArrayList<ClaimResponse> myClaims;
 
     private ArrayList<ClaimResponse> employeeClaims;
+//
+//    private int currentPage;
+//
+//    private int totalItems;
+//
+//    private int totalPages;
+
 }

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 
-//@CrossOrigin(origins = "https://769b-103-224-35-103.ap.ngrok.io", maxAge = 3600)
+//@CrossOrigin(origins = "https://d9be-103-224-33-94.ap.ngrok.io", maxAge = 3600)
 @RequestMapping("employee/api/")
 @RestController()
 public class EmployeeController {

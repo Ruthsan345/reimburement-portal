@@ -7,11 +7,11 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
-    Optional<Employee> findByEmail(String email);
+    Optional<Employee> findByAuthEmail(String email);
 
-    boolean existsByEmail(String email);
+    boolean existsByAuthEmail(String email);
 
-    Optional<Employee> findEmployeeByEmailAndIsdelete(String emailId,Boolean isDelete);
+    Optional<Employee> findEmployeeByIsdeleteAndAuthEmail(Boolean isDelete,String emailId);
 
     Optional<Employee> findByIdAndIsdelete(int empid, boolean isDelete);
 

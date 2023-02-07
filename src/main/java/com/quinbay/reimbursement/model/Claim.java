@@ -26,7 +26,7 @@ public class Claim implements Serializable {
     @GeneratedValue(strategy = GenerationType.SEQUENCE,generator = "claim_seq")
     private Integer id;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     private Employee employee;
 
     @OneToOne

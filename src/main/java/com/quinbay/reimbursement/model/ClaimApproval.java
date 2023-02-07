@@ -47,5 +47,13 @@ public class ClaimApproval implements Serializable {
     private Date updated_date;
 
     private boolean isdelete= false;
-    
+
+    public ClaimApproval(Claim claim, Integer approverid, int level, String status) {
+        this.claim = claim;
+        this.approverid = approverid;
+        this.level = level;
+        this.status = status;
+    }
+
+
 }

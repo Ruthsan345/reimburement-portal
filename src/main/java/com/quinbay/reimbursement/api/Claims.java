@@ -11,13 +11,13 @@ public interface Claims {
 
     ArrayList<ClaimCategoryResponse> getAllCategories() throws UserDefinedException;
 
-    String addClaim(ClaimRequest claimRequest) throws UserDefinedException;
+    Integer addClaim(ClaimRequest claimRequest) throws UserDefinedException;
 
     ArrayList<Claim> getAllClaims()throws UserDefinedException;
 
 //    String addClaimUsingImage(ClaimRequest claimRequest, List<MultipartFile> files) throws IOException;
 
-    ClaimResponseForMultipleUser getClaimsByEmployeeId(int employeeid, String status) throws UserDefinedException;
+    ClaimResponseForMultipleUser getClaimsByEmployeeId(int employeeid, String status, Integer pageNo, Integer pageSize) throws UserDefinedException;
 
     String updateClaimStatus(ClaimUpdateRequest claimUpdateRequest) throws UserDefinedException;
 
